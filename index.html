@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Escala - Estacionamento</title>
+    <!-- Importando Fonte Inter do Google -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
+            .no-print { display: none !important; }
+            body { background-color: white; padding: 0; }
+            .print-shadow-none { box-shadow: none !important; border: none !important; }
+            
+            /* Ajustes compactos para caber na folha A4 Retrato */
+            header { margin-bottom: 10px; padding-bottom: 0; }
+            header p { display: none; } /* Ocultar subtítulo na impressão */
+            h1 { font-size: 18px !important; margin: 0 !important; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { 
+                padding: 4px 2px !important; /* Espaçamento mínimo */
+                border: 1px solid #cbd5e1 !important; 
+                font-size: 10px !important; /* Fonte menor para caber */
+                text-align: center; 
+                line-height: 1.1;
+            }
+            
+            .badge-print { 
+                border: none !important; 
+                color: #0f172a !important; 
+                padding: 0 !important; 
+                background: transparent !important; 
+                font-weight: 600 !important;
+                font-size: 9px !important;
+            }
+            
+            th.sticky, td.sticky { position: static !important; }
+            .table-scroll { max-height: none !important; overflow: visible !important; border: none !important; }
+            tr { page-break-inside: avoid; }
+            thead { display: table-header-group; }
+            
+            /* Cores e destaques da Impressão */
+            .print-summary { 
+                background-color: #f8fafc !important; 
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                border-top: 2px solid #64748b !important;
+                border-bottom: 2px solid #64748b !important;
+                color: #0f172a !important;
+            }
+            .print-month-summary {
+                background-color: #1e293b !important;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                color: #ffffff !important;
+                font-weight: bold;
+            }
+            .print-summary td, .print-month-summary td { font-weight: bold; font-size: 10px !important; }
+            .print-sunday { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+        
+        /* Custom scrollbar para a tabela na tela */
+        .table-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .table-scroll::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 text-slate-800 min-h-screen p-2 sm:p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Cabeçalho -->
+        <header class="text-center no-print space-y-2 px-2">
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-900 flex justify-center items-center gap-2 tracking-tight flex-wrap">
+                <i data-lucide="car-front" class="w-7 h-7 md:w-8 md:h-8 text-blue-600"></i>
+                Escala de Estacionamento
+            </h1>
+            <p class="text-sm md:text-base text-slate-500 font-medium">Revezamento dinâmico com fechamento semanal (44h) e mensal (190h).</p>
+        </header>
+
+        <!-- Título que só aparece na impressão -->
+        <div class="hidden print:block text-center font-bold text-lg mb-2 uppercase" id="printTitle">
+            ESCALA DE TRABALHO - MÊS
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+            
+            <!-- Painel Lateral -->
+            <div class="lg:col-span-1 space-y-4 no-print">
+                <div class="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 print-shadow-none">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i data-lucide="users" class="w-5 h-5 text-blue-500"></i>
+                        Manobristas
+                    </h2>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="employeeName" placeholder="Nome do funcionário..." 
+                            class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm min-w-0"
+                            onkeypress="handleKeyPress(event)">
+                        <button onclick="addEmployee()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 font-semibold text-sm shadow-sm shrink-0">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Add
+                        </button>
+                    </div>
+
+                    <ul id="employeeList" class="space-y-2 max-h-48 overflow-y-auto pr-2 text-sm font-medium">
+                        <!-- JS -->
+                    </ul>
+
+                    <!-- Novo Seletor de Sábado -->
+                    <div class="mt-4 pt-4 border-t border-slate-100">
+                        <label for="satWorkerSelect" class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                            <i data-lucide="calendar-check-2" class="w-3 h-3 inline mr-1 text-blue-500"></i> Escala de Sábado
+                        </label>
+                        <select id="satWorkerSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm bg-slate-50 text-slate-700 font-semibold cursor-pointer">
+                            <option value="AUTO">Revezamento (1 por Sáb)</option>
+                            <!-- JS -->
+                        </select>
+                        <p class="text-[10px] text-slate-400 mt-1.5 leading-tight mb-4">Define quem assumirá o plantão dos sábados.</p>
+                        
+                        <label for="satOneOffSelect" class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                            <i data-lucide="calendar-plus" class="w-3 h-3 inline mr-1 text-purple-500"></i> Exceção (Apenas 1 Sáb)
+                        </label>
+                        <select id="satOneOffSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm shadow-sm bg-purple-50 text-purple-800 font-semibold cursor-pointer">
+                            <option value="NONE">Nenhum</option>
+                            <!-- JS -->
+                        </select>
+                        <p class="text-[10px] text-slate-400 mt-1.5 leading-tight">Força este funcionário a trabalhar em um único sábado no mês.</p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50/80 p-4 md:p-5 rounded-2xl border border-blue-100 shadow-sm">
+                    <h3 class="font-bold text-blue-900 mb-3 text-sm flex items-center gap-2">
+                        <i data-lucide="info" class="w-4 h-4"></i>
+                        Padrões de Turno (Meta: 190h/mês)
+                    </h3>
+                    <ul class="text-xs text-blue-800 space-y-3 font-medium">
+                        <li class="flex items-start gap-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 mt-0.5 shrink-0 shadow-sm"></span>
+                            <span><strong>Abertura (8h):</strong> 07:00 as 16:00<br><span class="opacity-75 font-normal">1h de almoço</span></span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="w-3 h-3 rounded-full bg-amber-500 mt-0.5 shrink-0 shadow-sm"></span>
+                            <span><strong>Intermediário (8h):</strong> 09:00 as 18:00<br><span class="opacity-75 font-normal">1h de almoço</span></span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="w-3 h-3 rounded-full bg-indigo-500 mt-0.5 shrink-0 shadow-sm"></span>
+                            <span><strong>Fechamento (8h):</strong> 13:00 as 22:00<br><span class="opacity-75 font-normal">1h de janta</span></span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="w-3 h-3 rounded-full bg-purple-500 mt-0.5 shrink-0 shadow-sm"></span>
+                            <span><strong>Sábado (8h):</strong> 06:00 as 14:20<br><span class="opacity-75 font-normal">Turno único</span></span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="w-3 h-3 rounded-full bg-sky-500 mt-0.5 shrink-0 shadow-sm"></span>
+                            <span><strong>Meio-período (4h):</strong> 08:00 as 12:00<br><span class="opacity-75 font-normal">Sem intervalo</span></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Área Principal -->
+            <div class="lg:col-span-3">
+                <div class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 print-shadow-none overflow-hidden">
+                    
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 no-print gap-4">
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+                            <i data-lucide="calendar" class="w-5 h-5 text-blue-600"></i>
+                            Quadro Mensal
+                        </h2>
+                        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                            <input type="month" id="monthInput" class="flex-1 sm:flex-none px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-semibold text-slate-700 shadow-sm" title="Mês de Geração">
+                            <button onclick="generateSchedule()" 
+                                class="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-semibold text-sm shadow-sm">
+                                <i data-lucide="settings-2" class="w-4 h-4"></i> Gerar
+                            </button>
+                            <button onclick="window.print()" id="printBtn" class="hidden flex-1 sm:flex-none justify-center bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-semibold text-sm shadow-sm">
+                                <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="alertBox" class="hidden bg-red-50 text-red-700 p-4 rounded-xl mb-4 text-sm font-semibold border border-red-200 shadow-sm">
+                        Adicione funcionários para gerar a escala.
+                    </div>
+
+                    <!-- Tabela de Escala -->
+                    <div class="table-scroll overflow-x-auto border border-slate-200 rounded-xl hidden shadow-sm w-full" id="tableContainer">
+                        <table id="scheduleTable" class="w-full text-left relative">
+                            <thead class="sticky top-0 z-20 shadow-sm">
+                                <tr id="headerRow" class="bg-slate-800 text-white text-sm border-b border-slate-700">
+                                    <!-- Cabeçalho -->
+                                </tr>
+                            </thead>
+                            <tbody id="scheduleBody" class="text-sm bg-white">
+                                <!-- Linhas -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="tablePlaceholder" class="text-center py-16 md:py-20 px-4 text-slate-400 no-print flex flex-col items-center gap-3 border-2 border-dashed border-slate-200 rounded-2xl mt-2 bg-slate-50/50">
+                        <i data-lucide="calendar-range" class="w-10 h-10 md:w-12 md:h-12 text-slate-300"></i>
+                        <p class="font-medium text-slate-500 text-sm md:text-base">Selecione o mês desejado e clique em "Gerar" para montar a escala.</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Equipe baseada no PDF
+        let employees = ['Arquimendes', 'Célio', 'Ernani', 'Guilherme'];
+
+        window.onload = () => {
+            updateEmployeeList();
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            document.getElementById('monthInput').value = `${yyyy}-${mm}`;
+        };
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') addEmployee();
+        }
+
+        function addEmployee() {
+            const input = document.getElementById('employeeName');
+            const name = input.value.trim();
+            if (name === '') return;
+            if (employees.includes(name)) return alert('Funcionário já adicionado!');
+            employees.push(name);
+            input.value = '';
+            input.focus();
+            updateEmployeeList();
+        }
+
+        function removeEmployee(index) {
+            employees.splice(index, 1);
+            updateEmployeeList();
+        }
+
+        function updateEmployeeList() {
+            const list = document.getElementById('employeeList');
+            const satSelect = document.getElementById('satWorkerSelect');
+            const satOneOff = document.getElementById('satOneOffSelect');
+            const currentSatSelection = satSelect ? satSelect.value : 'AUTO';
+            const currentOneOffSelection = satOneOff ? satOneOff.value : 'NONE';
+
+            list.innerHTML = '';
+            if (satSelect) {
+                satSelect.innerHTML = '<option value="AUTO">Revezamento (1 por Sáb)</option>';
+            }
+            if (satOneOff) {
+                satOneOff.innerHTML = '<option value="NONE">Nenhum</option>';
+            }
+
+            employees.forEach((emp, index) => {
+                // Preenche a lista de funcionários
+                list.innerHTML += `
+                    <li class="flex justify-between items-center bg-white p-2.5 pl-4 rounded-xl border border-slate-200 group shadow-sm">
+                        <span class="font-semibold text-slate-700 truncate mr-2">${emp}</span>
+                        <button onclick="removeEmployee(${index})" class="text-slate-400 hover:text-red-500 p-1 rounded transition-colors shrink-0" title="Remover">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </li>
+                `;
+                
+                // Preenche as opções do seletor de Sábado
+                if (satSelect) {
+                    const isSelected = (currentSatSelection === emp) ? 'selected' : '';
+                    satSelect.innerHTML += `<option value="${emp}" ${isSelected}>Apenas ${emp}</option>`;
+                }
+                
+                // Preenche as opções do seletor de Sábado Único
+                if (satOneOff) {
+                    const isOneOffSelected = (currentOneOffSelection === emp) ? 'selected' : '';
+                    satOneOff.innerHTML += `<option value="${emp}" ${isOneOffSelected}>Apenas 1 Sáb: ${emp}</option>`;
+                }
+            });
+            lucide.createIcons();
+        }
+
+        // --- MATRIZ DE REVEZAMENTO MATEMÁTICO COM CORES MODERNAS ---
+        const shiftTypes = {
+            'A8': { label: '07:00 as 16:00', bg: 'bg-emerald-50', text: 'text-emerald-700 border border-emerald-200' },
+            'I8': { label: '09:00 as 18:00', bg: 'bg-amber-50', text: 'text-amber-700 border border-amber-200' },
+            'F8': { label: '13:00 as 22:00', bg: 'bg-indigo-50', text: 'text-indigo-700 border border-indigo-200' },
+            'S8': { label: '06:00 as 14:20', bg: 'bg-purple-50', text: 'text-purple-700 border border-purple-200' },
+            'M4': { label: '08:00 as 12:00', bg: 'bg-sky-50', text: 'text-sky-700 border border-sky-200' },
+            'OFF': { label: 'Folga', bg: 'bg-slate-100', text: 'text-slate-500 border border-slate-200' }
+        };
+
+        const getShiftHours = (shiftCode) => {
+            if (shiftCode.includes('8')) return 8;
+            if (shiftCode.includes('4')) return 4;
+            return 0;
+        };
+
+        // Mantida a matriz original para os dias de semana (seg-sex)
+        const weeklyMatrix = {
+            0: ['OFF', 'A8',  'F8',  'M4' ], 
+            1: ['A8',  'OFF', 'I8',  'F8' ], 
+            2: ['I8',  'A8',  'OFF', 'F8' ], 
+            3: ['A8',  'F8',  'I8',  'OFF'], 
+            4: ['M4',  'A8',  'F8',  'I8' ], 
+            5: ['F8',  'M4',  'A8',  'I8' ], 
+            6: ['A8',  'I8',  'M4',  'F8' ]  
+        };
+
+        function generateSchedule() {
+            const tableContainer = document.getElementById('tableContainer');
+            const tbody = document.getElementById('scheduleBody');
+            const headerRow = document.getElementById('headerRow');
+            const placeholder = document.getElementById('tablePlaceholder');
+            const printBtn = document.getElementById('printBtn');
+            const monthVal = document.getElementById('monthInput').value;
+
+            if (employees.length === 0) return alert("Adicione funcionários.");
+            if (!monthVal) return alert("Insira um mês válido.");
+
+            const [yearStr, monthStr] = monthVal.split('-');
+            const year = parseInt(yearStr);
+            const month = parseInt(monthStr);
+            
+            const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            const mesesNomes = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+
+            // Atualiza o título de impressão
+            document.getElementById('printTitle').innerText = `ESCALA DE TRABALHO - ${mesesNomes[month - 1]} / ${year}`;
+
+            tbody.innerHTML = '';
+            
+            // Cabeçalho Principal Fixado
+            headerRow.innerHTML = '<th class="p-3 font-bold border-r border-slate-700 sticky left-0 bg-slate-800 z-30 w-24 text-center">DATA</th>';
+            employees.forEach(emp => {
+                // min-w-[120px] adicionado para garantir que não achate as colunas em telemóveis
+                headerRow.innerHTML += `<th class="p-3 font-bold border-r border-slate-700 text-center uppercase text-xs tracking-wider min-w-[110px] sm:min-w-[120px]">${emp}</th>`;
+            });
+
+            const daysInMonth = new Date(year, month, 0).getDate();
+            let weeklyHours = new Array(employees.length).fill(0);
+            let monthlyHours = new Array(employees.length).fill(0);
+
+            // =========================================================================
+            // PRÉ-PROCESSAMENTO: REGRAS EXCLUSIVAS DE FIM DE SEMANA
+            // =========================================================================
+            const saturdays = [];
+            const sundays = [];
+            for (let day = 1; day <= daysInMonth; day++) {
+                let d = new Date(year, month - 1, day);
+                if (d.getDay() === 6) saturdays.push(day);
+                if (d.getDay() === 0) sundays.push(day);
+            }
+
+            // 1. Processar Sábados (Apenas 1 pessoa + Regra de Exceção)
+            const satAssignments = {};
+            const selectedSatWorker = document.getElementById('satWorkerSelect').value;
+            const oneOffWorker = document.getElementById('satOneOffSelect').value;
+            let satRoundRobin = 0;
+            let oneOffAssigned = false;
+            const oneOffIndex = employees.indexOf(oneOffWorker);
+            
+            saturdays.forEach(day => {
+                if (oneOffWorker !== 'NONE' && !oneOffAssigned) {
+                    // Exceção: Trabalha apenas no primeiro sábado disponível
+                    satAssignments[day] = oneOffIndex;
+                    oneOffAssigned = true;
+                } else if (selectedSatWorker !== 'AUTO') {
+                    // Fixa a pessoa selecionada (se não for AUTO)
+                    satAssignments[day] = employees.indexOf(selectedSatWorker);
+                } else {
+                    // Revezamento
+                    let candidate = satRoundRobin % employees.length;
+                    
+                    // Se for revezamento, garante que o funcionário que já fez o "OneOff" não pegue outro sábado seguido
+                    if (oneOffWorker !== 'NONE' && candidate === oneOffIndex) {
+                        satRoundRobin++;
+                        candidate = satRoundRobin % employees.length;
+                    }
+                    
+                    satAssignments[day] = candidate;
+                    satRoundRobin++;
+                }
+            });
+
+            // 2. Processar Domingos (Exatamente 2 pessoas & Regra do Guilherme)
+            const sunAssignments = {};
+            // Procurar pelo Guilherme (ignorando maiúsculas/minúsculas)
+            let guilhermeIndex = employees.findIndex(e => e.toLowerCase().includes('guilherme'));
+            let guilhermeAssignedSun = false;
+            let sunRoundRobin = 0;
+
+            sundays.forEach(day => {
+                let workersForThisSunday = [];
+
+                // Se existe o Guilherme e ele ainda não trabalhou um domingo no mês, ele entra.
+                if (guilhermeIndex !== -1 && !guilhermeAssignedSun) {
+                    workersForThisSunday.push(guilhermeIndex);
+                    guilhermeAssignedSun = true;
+                }
+
+                // Preencher o restante até ter exatamente 2 pessoas
+                while (workersForThisSunday.length < 2) {
+                    let candidate = sunRoundRobin % employees.length;
+                    
+                    // Se o candidato for o Guilherme e ele já bateu a cota dele, pule.
+                    if (candidate === guilhermeIndex && guilhermeAssignedSun && !workersForThisSunday.includes(guilhermeIndex)) {
+                        sunRoundRobin++;
+                        continue;
+                    }
+
+                    if (!workersForThisSunday.includes(candidate)) {
+                        workersForThisSunday.push(candidate);
+                    }
+                    sunRoundRobin++;
+                }
+                sunAssignments[day] = workersForThisSunday;
+            });
+            // =========================================================================
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                let d = new Date(year, month - 1, day);
+                let dayOfWeek = d.getDay();
+                
+                const isSunday = dayOfWeek === 0;
+                const rowClass = isSunday ? 'print-sunday bg-slate-50' : 'hover:bg-slate-50/80 bg-white';
+                
+                const tr = document.createElement('tr');
+                tr.className = `border-b border-slate-100 transition-colors ${rowClass}`;
+
+                // Coluna Data Fixa
+                let rowHTML = `<td class="p-2 font-bold text-slate-700 border-r border-slate-200 sticky left-0 z-10 whitespace-nowrap ${isSunday ? 'bg-slate-50' : 'bg-white'}">
+                    ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')} 
+                    <span class="text-[10px] uppercase ml-1 ${isSunday ? 'text-red-500 font-bold' : 'text-slate-400 font-medium'}">${diasSemana[dayOfWeek]}</span>
+                </td>`;
+
+                // Adiciona os turnos e soma as horas
+                employees.forEach((_, empIndex) => {
+                    const roleIndex = empIndex % 4; 
+                    let shiftCode = weeklyMatrix[dayOfWeek][roleIndex]; // Matriz base
+
+                    // APLICAR AS EXCEÇÕES SOBRESCRITAS
+                    if (dayOfWeek === 6) { // Regra do Sábado
+                        if (satAssignments[day] === empIndex) {
+                            shiftCode = 'S8'; // A pessoa sorteada ou escolhida assume
+                        } else {
+                            shiftCode = 'OFF'; // Os demais folgam
+                        }
+                    } else if (dayOfWeek === 0) { // Regra do Domingo
+                        if (sunAssignments[day].includes(empIndex)) {
+                            // O 1º sorteado faz Abertura, o 2º faz Fechamento
+                            shiftCode = sunAssignments[day][0] === empIndex ? 'A8' : 'F8';
+                        } else {
+                            shiftCode = 'OFF';
+                        }
+                    }
+
+                    const shift = shiftTypes[shiftCode];
+                    
+                    const hours = getShiftHours(shiftCode);
+                    weeklyHours[empIndex] += hours; // Memória Semanal
+                    monthlyHours[empIndex] += hours; // Memória Mensal
+
+                    rowHTML += `
+                        <td class="p-1.5 border-r border-slate-100 text-center">
+                            <span class="inline-block w-full px-2 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap ${shift.bg} ${shift.text} badge-print shadow-sm">
+                                ${shift.label}
+                            </span>
+                        </td>
+                    `;
+                });
+
+                tr.innerHTML = rowHTML;
+                tbody.appendChild(tr);
+
+                // FECHAMENTO DA SEMANA: Se for Domingo
+                if (dayOfWeek === 0 && day !== daysInMonth) {
+                    const sumTr = document.createElement('tr');
+                    sumTr.className = 'bg-slate-100/80 border-b-2 border-slate-300 font-bold text-slate-700 print-summary';
+                    
+                    let sumHTML = `<td class="p-2 text-right text-[10px] uppercase tracking-wider border-r border-slate-300 sticky left-0 bg-slate-100/80 z-10 print-summary">Total Semanal:</td>`;
+
+                    employees.forEach((_, empIndex) => {
+                        const total = weeklyHours[empIndex];
+                        sumHTML += `<td class="p-2 border-r border-slate-300 text-center text-xs print-summary">${total}h</td>`;
+                    });
+
+                    sumTr.innerHTML = sumHTML;
+                    tbody.appendChild(sumTr);
+
+                    // Zera a contagem para a próxima semana
+                    weeklyHours.fill(0);
+                }
+            }
+
+            // FECHAMENTO MENSAL: Adiciona a linha final com o cálculo do mês e validação de 190h
+            const monthSumTr = document.createElement('tr');
+            monthSumTr.className = 'bg-slate-800 border-t-4 border-slate-900 font-bold text-white print-month-summary';
+            
+            let monthSumHTML = `<td class="p-3 text-right text-xs uppercase tracking-wider border-r border-slate-700 sticky left-0 bg-slate-800 z-10 print-month-summary">TOTAL MENSAL (190h):</td>`;
+
+            employees.forEach((_, empIndex) => {
+                const totalMonth = monthlyHours[empIndex];
+                
+                // Realce visual dependendo de quantas horas fez no mês comparado a meta de 190h
+                let colorClass = 'text-white';
+                if (totalMonth > 190) colorClass = 'text-amber-300'; // Fez hora extra no mês
+                if (totalMonth < 190) colorClass = 'text-sky-300'; // Fez menos (meses mais curtos como Fevereiro)
+
+                monthSumHTML += `<td class="p-3 border-r border-slate-700 text-center text-sm ${colorClass} print-month-summary">${totalMonth}h</td>`;
+            });
+
+            monthSumTr.innerHTML = monthSumHTML;
+            tbody.appendChild(monthSumTr);
+
+            tableContainer.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            printBtn.classList.remove('hidden');
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
